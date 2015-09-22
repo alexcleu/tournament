@@ -1,4 +1,4 @@
-rdb-fullstack
-=============
-
-Common code for the Relational Databases and Full Stack Fundamentals courses
+To check the test
+1) Vagrant SSH into the fullstack environment
+2) Run the tournament_test.py code
+3) completed. Passed all the test!
