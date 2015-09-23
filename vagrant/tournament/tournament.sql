@@ -19,6 +19,17 @@ CREATE TABLE MATCHES(
 	wins int DEFAULT 0,
 	matches int DEFAULT 0,
 	player_id references players(id),
-)
+);
 					 
-	
+CREATE VIEW PAIRING as
+    SELECT a.player_id as id1, 
+           b.player_id as id2
+    from matches as a, matches as b
+    where a.wins = b.wins
+    AND a.player_id != b.player_id
+    and a.player_id > b.player_id
+;
+
+CREATE TABLE FREEWIN(
+  player_id int references players(id)
+);
