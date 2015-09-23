@@ -1,4 +1,10 @@
-To check the test
-1) Vagrant SSH into the fullstack environment
-2) Run the tournament_test.py code
-3) completed. Passed all the test!
+#Tournament Database
+######Able to work on swiss matching for game pairs
+* Vagrant SSH into the fullstack environment
+  - Go to the directory under vagrant
+  - set up vagrant 
+  - ssh vagrant to go into the same environment
+* Run the tournament_test.py code
+  - cd to tournament
+  - Under tournament, run tournament_test.py
+* completed! Passed all the test!
