@@ -99,15 +99,8 @@ def playerStandings():
             if id not in player_ids:
                 c.execute("INSERT INTO MATCHES (player_id) VALUES (%s)", (id,))
         # Query the returns to check for player statuses
-        c.execute(""" SELECT a.id as id,
-                             a.name as name,
-                             b.wins as wins,
-                             b.matches as matches
-                      FROM players a
-                      JOIN matches b
-                      on a.id = b.player_id
-                      GROUP BY 1,2,3,4
-                      ORDER BY wins DESC      
+        c.execute(""" SELECT * 
+                      FROM STANDING    
                   """)
         return c.fetchall()
 

@@ -41,6 +41,18 @@ CREATE VIEW PAIRING as
     AND a.player_id != b.player_id
     and a.player_id > b.player_id
 ;
+
+CREATE VIEW STANDING AS
+    SELECT a.id as id,
+           a.name as name,
+	       b.wins as wins,
+           b.matches as matches
+           FROM players a
+           JOIN matches b
+           on a.id = b.player_id
+           GROUP BY 1,2,3,4
+           ORDER BY wins DESC 
+; 
 --Create a table to record games players had won with out playing
 --player_id: player_id of the player that receives a free win
 CREATE TABLE FREEWIN(
