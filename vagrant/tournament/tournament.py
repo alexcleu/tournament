@@ -4,55 +4,59 @@
 #
 
 import psycopg2
-
+import contextlib
 
 def connect():
     """Connect to the PostgreSQL database.  Returns a database connection."""
     # call PosgreSql
     return psycopg2.connect("dbname=tournament")
 
-def deleteFreeWin():
-    """Remove all of the recorded data under free win for odd player"""
+@contextlib.contextmanager
+def get_cursor():
+    """Call out the cursor of the PstgreSQL
+    Commit the query if 
+    """
     DB = connect()
     c = DB.cursor()
-    # Delete the freewin table
-    c.execute("DELETE FROM FREEWIN")
-    DB.commit()
-    DB.close()
+    try:
+        yield c
+    except:
+        raise
+    else:
+        DB.commit()
+    finally:
+        c.close()
+        DB.close()
+
+def deleteFreeWin():
+    """Remove all of the recorded data under free win for odd player"""
+    with get_cursor() as c:
+        c.execute("DELETE FROM FREEWIN")
     
 def deleteMatches():
     """Remove all the match records from the database."""
     # Call delete Freewin method to pass the test script
     deleteFreeWin()
-    DB = connect()
-    c = DB.cursor()
-    # Delete the matches
-    c.execute("DELETE FROM MATCHES")
-    DB.commit()
-    DB.close()
+    with get_cursor() as c:
+        c.execute("DELETE FROM MATCHES")
 
 def deletePlayers():
     """Remove all the player records from the database."""
-    DB = connect()
-    c = DB.cursor()
-    # Delete the players
-    c.execute("DELETE FROM PLAYERS")
-    DB.commit()
-    DB.close()
+    with get_cursor() as c:
+        # Delete the players
+        c.execute("DELETE FROM PLAYERS")
 
 
 def countPlayers():
     """Returns the number of players currently registered."""
-    DB = connect()
-    c = DB.cursor()
-    # Count the number of players
-    c.execute("SELECT COUNT(*) FROM PLAYERS")
-    result =  c.fetchall()
-    # Turn the result into an integer
-    for row in result:
-        total_count = row[0]
-    DB.close()
-    return total_count
+    with get_cursor() as c:
+        # Count the number of players
+        c.execute("SELECT COUNT(*) FROM PLAYERS")
+        result =  c.fetchall()
+        # Turn the result into an integer
+        for row in result:
+            total_count = row[0]
+        return total_count
 
     
 
@@ -65,12 +69,10 @@ def registerPlayer(name):
     Args:
       name: the player's full name (need not be unique).
     """
-    DB = connect()
-    c = DB.cursor()
-    # Insert new player into the table players
-    c.execute("INSERT INTO PLAYERS (name) VALUES (%s)",(name,))
-    DB.commit()
-    DB.close()
+    with get_cursor() as c:
+        # Insert new player into the table players
+        c.execute("INSERT INTO PLAYERS (name) VALUES (%s)",(name,))
+
 
 def playerStandings():
     """Returns a list of the players and their win records, sorted by wins.
@@ -85,34 +87,32 @@ def playerStandings():
         wins: the number of matches the player has won
         matches: the number of matches the player has played
     """
-    DB = connect()
-    c = DB.cursor()
-    player_ids = []
-    # Collect the whole list of players
-    c.execute("SELECT player_id from matches")
-    for player_id in c.fetchall():
-        # Append player_id into the list player_ids
-        player_ids.append(player_id[0])
-    # Check to see if the player is standing already
-    c.execute("SELECT id, name FROM PLAYERS")
-    for id, name in c.fetchall():
-        # Insert the player_id in matches if it doesn't exists in matches
-        if id not in player_ids:
-            c.execute("INSERT INTO MATCHES (player_id) VALUES (%s)", (id,))
-            DB.commit()
-    # Query the returns to check for player statuses
-    c.execute(""" SELECT a.id as id,
-                         a.name as name,
-                         b.wins as wins,
-                         b.matches as matches
-                  FROM players a
-                  JOIN matches b
-                  on a.id = b.player_id
-                  GROUP BY 1,2,3,4
-                  ORDER BY wins DESC      
-              """)
-    return c.fetchall()
-    DB.close()
+    with get_cursor() as c:
+        player_ids = []
+        # Collect the whole list of players
+        c.execute("SELECT player_id from matches")
+        for player_id in c.fetchall():
+            # Append player_id into the list player_ids
+            player_ids.append(player_id[0])
+        # Check to see if the player is standing already
+        c.execute("SELECT id, name FROM PLAYERS")
+        for id, name in c.fetchall():
+            # Insert the player_id in matches if it doesn't exists in matches
+            if id not in player_ids:
+                c.execute("INSERT INTO MATCHES (player_id) VALUES (%s)", (id,))
+        # Query the returns to check for player statuses
+        c.execute(""" SELECT a.id as id,
+                             a.name as name,
+                             b.wins as wins,
+                             b.matches as matches
+                      FROM players a
+                      JOIN matches b
+                      on a.id = b.player_id
+                      GROUP BY 1,2,3,4
+                      ORDER BY wins DESC      
+                  """)
+        return c.fetchall()
+
 
 def reportMatch(winner, loser):
     """Records the outcome of a single match between two players.
@@ -121,57 +121,51 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
-    DB = connect()
-    c = DB.cursor()
-    # Adds stats for winners
-    c.execute("""UPDATE MATCHES
-                SET matches = matches + 1, wins = wins +1
-                WHERE player_id = (%s)
-              """,(winner,))
-    DB.commit()
-    # Adds stats for losers
-    c.execute("""UPDATE MATCHES
-                 SET matches = matches + 1 
-                 WHERE player_id = (%s)
-              """,(loser,))
-    DB.commit()
-    DB.close()
+    with get_cursor() as c:
+        # Adds stats for winners
+        c.execute("""UPDATE MATCHES
+                     SET matches = matches + 1, wins = wins +1
+                     WHERE player_id = (%s)
+                  """,(winner,))
+        # Adds stats for losers
+        c.execute("""UPDATE MATCHES
+                     SET matches = matches + 1 
+                     WHERE player_id = (%s)
+                  """,(loser,))
+
 
 def oddorEven():
     """Checks whether the players are in odds or evens
     
     Return a TRUE or player_id response
     """
-    DB = connect()
-    c = DB.cursor()
-    # Count whether there's odds or even number
-    c.execute("""SELECT COUNT(*)
-                 FROM MATCHES
-              """)
-    for players in c.fetchall():
-        total = players[0]
-    if total % 2 == 0:
-        DB.close()
-        return "True"        
-    else:
-        # Free points for the lowest win
-        # Check the player hasn't won free point already
-        c.execute("""SELECT a.player_id
-                     FROM MATCHES a
-                     LEFT JOIN FREEWIN b
-                     ON a.player_id = b.player_id
-                     WHERE b.player_id is NULL
-                     ORDER BY WINS ASC
-                     LIMIT 1
-                  """
-                  )
-        for player_ids in c.fetchall():
-            player_id = player_ids[0]
-            # Add points to the odd one
-            oddOneFreePoints(player_id)     
-        DB.close()
-        # Return player_id of the odd one
-        return player_id
+    with get_cursor() as c:
+        # Count whether there's odds or even number
+        c.execute("""SELECT COUNT(*)
+                     FROM MATCHES
+                  """)
+        for players in c.fetchall():
+            total = players[0]
+        if total % 2 == 0:
+            return "True"        
+        else:
+            # Free points for the lowest win
+            # Check the player hasn't won free point already
+            c.execute("""SELECT a.player_id
+                         FROM MATCHES a
+                         LEFT JOIN FREEWIN b
+                         ON a.player_id = b.player_id
+                         WHERE b.player_id is NULL
+                         ORDER BY WINS ASC
+                         LIMIT 1
+                      """
+                      )
+            for player_ids in c.fetchall():
+                player_id = player_ids[0]
+                # Add points to the odd one
+                oddOneFreePoints(player_id)     
+            # Return player_id of the odd one
+            return player_id
         
 def oddOneFreePoints(player_id):
     """ Returns a free point for the odd player
@@ -181,21 +175,17 @@ def oddOneFreePoints(player_id):
     Returns:
       Free points for the player
     """
-    DB = connect()
-    c = DB.cursor()
-    # Add points for the odd one
-    c.execute("""UPDATE MATCHES
-                 SET wins = wins + 1
-                 where player_id = (%s)
-              """,(player_id,
-              ))
-    DB.commit()
-    # Add the player that had a free win
-    c.execute("""INSERT INTO FREEWIN VALUES (%s)
-              """,(player_id,
-              ))
-    DB.commit()
-    DB.close()
+    with get_cursor() as c:
+        # Add points for the odd one
+        c.execute("""UPDATE MATCHES
+                     SET wins = wins + 1
+                     where player_id = (%s)
+                  """,(player_id,
+                  ))
+        # Add the player that had a free win
+        c.execute("""INSERT INTO FREEWIN VALUES (%s)
+                  """,(player_id,
+                  ))
 
  
 def swissPairings():
@@ -213,47 +203,44 @@ def swissPairings():
         id2: the second player's unique id
         name2: the second player's name
     """
-    DB = connect()
-    c = DB.cursor()
-    # Check whether the players are odd or even
-    Result_oddorEven = oddorEven()
-    
-    if Result_oddorEven == "True":
-        # self join to get the players matched
-        c.execute("""
-                  SELECT c.id1 as id1,
-                         d.name as name1,
-                         c.id2 as id2,
-                         e.name as name2
-                  FROM(    
-                  SELECT id1, 
-                         id2
-                  FROM pairing
-                  ) as c
-                  JOIN players as d
-                  on c.id1 = d.id
-                  JOIN players e
-                  on c.id2 = e.id
-              
-                  """
-                  )
-    else:
-        c.execute("""
-                  SELECT c.id1 as id1,
-                         d.name as name1,
-                         c.id2 as id2,
-                         e.name as name2
-                  FROM(    
-                  SELECT id1, 
-                         id2
-                  FROM pairing
-                  ) as c
-                  JOIN players as d
-                  on c.id1 = d.id
-                  JOIN players e
-                  on c.id2 = e.id
-                  where c.id1 != (%s)
-                  and c.id2 != (%s)
-                  """
-                  ,(Result_oddorEven,Result_oddorEven,))
-    return c.fetchall()
+    with get_cursor() as c:
+        # Check whether the players are odd or even
+        Result_oddorEven = oddorEven()
+        if Result_oddorEven == "True":
+            # self join to get the players matched
+            c.execute("""
+                      SELECT c.id1 as id1,
+                             d.name as name1,
+                             c.id2 as id2,
+                             e.name as name2
+                      FROM(    
+                      SELECT id1, 
+                             id2
+                      FROM pairing
+                      ) as c
+                      JOIN players as d
+                      on c.id1 = d.id
+                      JOIN players e
+                      on c.id2 = e.id  
+                      """
+                      )
+        else:
+            c.execute("""
+                      SELECT c.id1 as id1,
+                             d.name as name1,
+                             c.id2 as id2,
+                             e.name as name2
+                      FROM(    
+                      SELECT id1, 
+                             id2
+                      FROM pairing
+                      ) as c
+                      JOIN players as d
+                      on c.id1 = d.id
+                      JOIN players e
+                      on c.id2 = e.id
+                      where c.id1 != (%s)
+                      and c.id2 != (%s)
+                      """
+                      ,(Result_oddorEven,Result_oddorEven,))
+        return c.fetchall()
