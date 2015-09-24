@@ -4,14 +4,14 @@
 #
 
 import psycopg2
-import contextlib
+from contextlib import contextmanager
 
 def connect():
     """Connect to the PostgreSQL database.  Returns a database connection."""
     # call PosgreSql
     return psycopg2.connect("dbname=tournament")
 
-@contextlib.contextmanager
+@contextmanager
 def get_cursor():
     """Call out the cursor of the PstgreSQL
     Commit the query if 
@@ -52,12 +52,10 @@ def countPlayers():
     with get_cursor() as c:
         # Count the number of players
         c.execute("SELECT COUNT(*) FROM PLAYERS")
-        result =  c.fetchall()
+        result =  c.fetchone()
         # Turn the result into an integer
-        for row in result:
-            total_count = row[0]
+        total_count = result[0]
         return total_count
-
     
 
 def registerPlayer(name):
@@ -160,10 +158,9 @@ def oddorEven():
                          LIMIT 1
                       """
                       )
-            for player_ids in c.fetchall():
-                player_id = player_ids[0]
-                # Add points to the odd one
-                oddOneFreePoints(player_id)     
+            player_id = c.fetchone()[0]
+            # Add points to the odd one
+            oddOneFreePoints(player_id)     
             # Return player_id of the odd one
             return player_id
         
